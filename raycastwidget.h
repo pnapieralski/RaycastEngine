@@ -5,11 +5,17 @@
 #include <QBasicTimer>
 #include <QTimer>
 
+//! XXX TODO Create Scene class
+class Scene {};
+
+//! Forward declarations
+class Camera;
+
 class RaycastWidget : public QWidget
 {
     Q_OBJECT
 public:
-    explicit RaycastWidget(QWidget *parent = 0);
+    explicit RaycastWidget(Camera *cam, Scene *scene = 0, QWidget *parent = 0);
 
     void render();
     void paintEvent(QPaintEvent *event);
@@ -22,6 +28,7 @@ public slots:
 
 private:
     void putPixel(int x, int y, QRgb &color);
+    void clearScreen(QRgb &color);
 
 private:
     QImage buffer;
@@ -32,6 +39,9 @@ private:
 
     // For setting update speed
     QBasicTimer ticker;
+
+    // Pointer to camera
+    Camera *pCam;
 };
 
 #endif // RUICASTWIDGET_H

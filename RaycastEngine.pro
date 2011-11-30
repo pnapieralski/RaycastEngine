@@ -4,20 +4,57 @@
 #
 #-------------------------------------------------
 
+QT += core gui
 
-TARGET = TestQTGuiApplication
+TARGET = RaycastEngine
 TEMPLATE = app
 
 
-SOURCES += main.cpp\
-    raycastwidget.cpp
+SOURCES +=\
+    camera.cpp \
+    main.cpp \
+    raycastwidget.cpp \
+    vector3.cpp
 
-HEADERS  += raycastwidget.h
+HEADERS  += \
+    vector3.h \
+    raycastwidget.h \
+    camera.h
 
-target.path = $$[QT_INSTALL_EXMAPLES]/widgets/TestQTGuiApplication
-sources.files = $$SOURCES $$HEADERS $$RESOURCES $$FORMS TestQTGuiApplication.pro
-sources.path = $$[QT_INSTALL_EXAMPLES]/widgets/TestQTGuiApplication
-INSTALLS += target sources
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
