@@ -1,6 +1,6 @@
 #include <QtGui/QApplication>
 #include "Camera.h"
-#include "RaycastWidget.h"
+#include "view.h"
 
 int main(int argc, char *argv[])
 {
@@ -8,10 +8,11 @@ int main(int argc, char *argv[])
 
 
     Camera cam;
-    RaycastWidget raycast(&cam);
+    Scene scene(&cam);
+    View raycast(&scene);
 
     raycast.setWindowTitle("Raycasting demo");
-    raycast.resize(320, 240);
+    raycast.resize(640, 480);
     raycast.show();
 
     return a.exec();

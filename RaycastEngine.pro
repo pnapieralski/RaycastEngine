@@ -13,13 +13,21 @@ TEMPLATE = app
 SOURCES +=\
     camera.cpp \
     main.cpp \
-    raycastwidget.cpp \
-    vector3.cpp
+    vector3.cpp \
+    view.cpp
 
 HEADERS  += \
     vector3.h \
-    raycastwidget.h \
-    camera.h
+    camera.h \
+    view.h
+
+
+
+
+
+
+
+
 
 
 

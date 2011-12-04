@@ -12,6 +12,8 @@ public:
     Vector3 pos;
     Vector3 rot;
     int depth;
+    int fov;
+    float fovInRad;
 
     // received from widget
     int width;
