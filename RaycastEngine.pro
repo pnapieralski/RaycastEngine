@@ -14,12 +14,22 @@ SOURCES +=\
     camera.cpp \
     main.cpp \
     vector3.cpp \
-    view.cpp
+    view.cpp \
+    mainwindow.cpp
 
 HEADERS  += \
     vector3.h \
     camera.h \
-    view.h
+    view.h \
+    mainwindow.h
+
+FORMS += \
+    mainwindow.ui
+
+
+
+
+
 
 
 

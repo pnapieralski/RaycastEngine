@@ -9,11 +9,8 @@ class Camera : public QObject
     Q_OBJECT
 public:
     explicit Camera(QObject *parent = 0);
-    Vector3 pos;
-    Vector3 rot;
+    qreal x, y, angle, fov;
     int depth;
-    int fov;
-    float fovInRad;
 
     // received from widget
     int width;

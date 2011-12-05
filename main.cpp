@@ -1,19 +1,22 @@
 #include <QtGui/QApplication>
-#include "Camera.h"
-#include "view.h"
+#include "mainwindow.h"
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
 
 
-    Camera cam;
+    MainWindow mainwindow;
+
+    mainwindow.show();
+
+    /*Camera cam;
     Scene scene(&cam);
     View raycast(&scene);
 
     raycast.setWindowTitle("Raycasting demo");
     raycast.resize(640, 480);
-    raycast.show();
+    raycast.show();*/
 
     return a.exec();
 }
