@@ -7,6 +7,7 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.GL10;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.TextureData;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.input.RemoteInput;
@@ -21,7 +22,7 @@ public class RaysGame implements ApplicationListener {
 	static final int TILE_SIZE = 64;
 	static final int WALL_HEIGHT = 64;
 	static final int PROJECTION_PLANE_WIDTH = 320;
-	static final int PROJECTION_PLANE_HEIGHT = 240;
+	static final int PROJECTION_PLANE_HEIGHT = 200;
 	
 	// position on projection plane that represents the angles
 	static final int ANGLE60 = PROJECTION_PLANE_WIDTH;
@@ -48,9 +49,9 @@ public class RaysGame implements ApplicationListener {
 	
 	public static int playerX = 100;
 	public static int playerY = 160;
-	public static int playerAngle = ANGLE5;
-	int playerDistanceToProjectionPlane = 277;
-	int playerHeight = 32;
+	public static int playerAngle = ANGLE90;
+	public static int playerHeight = 32;
+	int playerDistanceToProjectionPlane = 255;
 	int playerSpeed = 16;
 	int projectionPlaneYCenter = PROJECTION_PLANE_HEIGHT / 2;
 	int playerMapX, playerMapY;
@@ -69,6 +70,14 @@ public class RaysGame implements ApplicationListener {
 	Texture joystickBG;
 	Texture joystick;
 	
+	Texture walls;
+    TextureData wallTexData;
+    Pixmap wallPixmap;
+    
+    Texture floor;
+    TextureData floorTexData;
+    Pixmap floorPixmap;
+	
 	Input input = new Input();
 	
 	@Override
@@ -78,8 +87,17 @@ public class RaysGame implements ApplicationListener {
 		
 		joystickBG = new Texture(Gdx.files.internal("data/joystick_bg.png"));
 		joystick = new Texture(Gdx.files.internal("data/joystick.png"));
+		walls = new Texture(Gdx.files.internal("data/walls.png"));
+		floor = new Texture(Gdx.files.internal("data/floor.png"));
 		
-		
+        wallTexData = walls.getTextureData();
+        wallTexData.prepare();
+        wallPixmap = wallTexData.consumePixmap(); // get the wall texture pixmap for later copying
+
+        floorTexData = floor.getTextureData();
+        floorTexData.prepare();
+        floorPixmap = floorTexData.consumePixmap(); // get the wall texture pixmap for later copying
+        
 		// Create an empty dynamic pixmap
 		pixmap = new Pixmap(PROJECTION_PLANE_WIDTH, PROJECTION_PLANE_HEIGHT, Pixmap.Format.RGBA8888);
 		
@@ -105,9 +123,70 @@ public class RaysGame implements ApplicationListener {
 	}
 
 	@Override
-	public void render() {		
+	public void render() {
 		drawBackground();
-		castRays();
+		float dist = castRays();
+		
+		// Update joystick position on screen
+		int joystickX = 0;
+		int joystickY = 0;
+		int imageHalfWidth = 32; // half width/height of joystick image
+		int edgePadding = 10;
+		if( Gdx.input.isTouched() ) {
+			int BOUNDARY = 115;
+			int x = Gdx.input.getX();
+			int y = Gdx.input.getY();
+			
+			int height = Gdx.graphics.getHeight();
+			
+			joystickX = x-imageHalfWidth;
+			
+			// note, input goes from (0,0) in top-left... drawing is from (0,0) in bottom-left... so we must subtract from height
+			joystickY = height-y-imageHalfWidth;
+			
+			// Cap the x,y values so they don't go beyond joystick boundaries
+			if( joystickX > BOUNDARY ) joystickX = BOUNDARY;
+			
+			if( joystickY > BOUNDARY ) joystickY = BOUNDARY;
+			
+			if( joystickY < 0 ) joystickY = 0;
+			if( joystickX < 0 ) joystickX = 0;
+		}
+		else {
+			// center joystick to bottom-left
+			joystickX = edgePadding + imageHalfWidth;
+			joystickY = edgePadding + imageHalfWidth;
+		}
+		
+		// move player based on joystick movement
+		final int DEAD_ZONE = 10; // 10 pixel dead_zone
+		final int SCALE = 5;
+		
+		int movementX = joystickX - (edgePadding + imageHalfWidth);
+		int movementY = joystickY - (edgePadding + imageHalfWidth);
+		movementX /= SCALE;
+		movementY /= SCALE;
+		
+		int signX = (int) Math.signum( (double)movementX )*SCALE;
+		int signY = (int) Math.signum( (double)movementY )*SCALE;
+		if( movementX*signX > DEAD_ZONE ) {
+			//playerX += Math.cos(degToRad(playerAngle))*signX;
+			//playerY += Math.sin(degToRad(playerAngle))*signY;
+			
+			playerAngle += movementX;
+			if( playerAngle >= ANGLE360 ) playerAngle -= ANGLE360;
+			if( playerAngle < 0 ) playerAngle += ANGLE360;
+		}
+		if( movementY*signY > DEAD_ZONE ) {
+			//playerX += cosTable[playerAngle]*signX;
+			//playerY += sinTable[playerAngle]*signY;
+			//Gdx.app.log(TAG, ""+playerAngle);
+			playerX += cosTable[playerAngle]*movementY;
+			playerY += sinTable[playerAngle]*movementY;
+		}
+		//Gdx.app.log(TAG, "pAngle "+playerAngle);
+		
+		
 		texture.draw(pixmap, 0, 0);
 		
 		Gdx.gl.glClearColor(0.6f, 0.6f, 0.6f, 1);
@@ -120,32 +199,11 @@ public class RaysGame implements ApplicationListener {
 		// Draw joystick (if necessary)
 		batch.draw(joystickBG, 10, 10);
 		
-		if( Gdx.input.isTouched() ) {
-			int BOUNDARY = 115;
-			int x = Gdx.input.getX();
-			int y = Gdx.input.getY();
-			
-			int height = Gdx.graphics.getHeight();
-			
-			int capX = x-32; // subtract 32 to get center of image
-			
-			// note, input goes from (0,0) in top-left... drawing is from (0,0) in bottom-left... so we must subtract from height
-			int capY = height-y-32;
-			
-			// Cap the x,y values so they don't go beyond joystick boundaries
-			if( capX > BOUNDARY ) capX = BOUNDARY;
-			
-			if( capY > BOUNDARY ) capY = BOUNDARY;
-			
-			// center joystick on finger/cursor
-			batch.draw(joystick, capX, capY );
-		}
-		else {
-			// center joystick to bottom-left
-			batch.draw(joystick, 10 + 32, 10 + 32);
-		}
-		
+		// center joystick on finger/cursor
+		batch.draw(joystick, joystickX, joystickY );
 		batch.end();
+		
+		// Move player based on  
 	}
 
 	@Override
@@ -265,15 +323,17 @@ public class RaysGame implements ApplicationListener {
 		}
 		
 		// ground
-		c = 22;
-		for( ; r < PROJECTION_PLANE_HEIGHT; r += 15 ) {
-			pixmap.setColor( (float)c / (float)255, 0.1f, 0.1f, 1.0f );
-			pixmap.fillRectangle(0, r, PROJECTION_PLANE_WIDTH, 15);
-			c += 15;
-		}
+		pixmap.setColor( 0.4f, 0.4f, 0.4f, 1.0f );
+		pixmap.fillRectangle(0, r, PROJECTION_PLANE_WIDTH, PROJECTION_PLANE_HEIGHT/2);
+		//c = 22;
+		//for( ; r < PROJECTION_PLANE_HEIGHT; r += 15 ) {
+		//	pixmap.setColor( (float)c / (float)255, 0.1f, 0.1f, 1.0f );
+		//	pixmap.fillRectangle(0, r, PROJECTION_PLANE_WIDTH, 15);
+		//	c += 15;
+		//}
 	}
 	
-	public void castRays() {		
+	public float castRays() {		
 	    int verticalGrid;        // horizotal or vertical coordinate of intersection
 	    int horizontalGrid;      // theoritically, this will be multiple of TILE_SIZE
 	                             // , but some trick did here might cause
@@ -293,190 +353,205 @@ public class RaysGame implements ApplicationListener {
 	    float distToHorizontalGridBeingHit;      // the viewpoint
 
 	    int castArc, castColumn;
-
+	    float dist = 0;
+	    
 	    castArc = playerAngle;
-	        // field of view is 60 degree with the point of view (player's direction in the middle)
-	        // 30  30
-	        //    ^
-	        //  \ | /
-	        //   \|/
-	        //    v
-	        // we will trace the rays starting from the leftmost ray
-	        castArc-=ANGLE30;
-	        // wrap around if necessary
+        // field of view is 60 degree with the point of view (player's direction in the middle)
+        // 30  30
+        //    ^
+        //  \ | /
+        //   \|/
+        //    v
+        // we will trace the rays starting from the leftmost ray
+        castArc-=ANGLE30;
+        // wrap around if necessary
 	        
 	    if (castArc < 0)
 	    {
-	      castArc=ANGLE360 + castArc;
+	      castArc += ANGLE360;
 	    }
-
-	    for (castColumn=0; castColumn < PROJECTION_PLANE_WIDTH; castColumn+=5)
-	    {
-	          // ray is between 0 to 180 degree (1st and 2nd quadrant)
-	          // ray is facing down
+	    
+	    final int STRIDE = 3;
+	    for (castColumn=0; castColumn < PROJECTION_PLANE_WIDTH; castColumn+=STRIDE)
+	    {   
+	      // ray is between 0 to 180 degree (1st and 2nd quadrant)
+	      // ray is facing down
 	      if (castArc > ANGLE0 && castArc < ANGLE180)
 	      {
-	                // truncuate then add to get the coordinate of the FIRST grid (horizontal
-	                // wall) that is in front of the player (this is in pixel unit)
-	                // ROUND DOWN
-	        horizontalGrid = (playerY/TILE_SIZE)*TILE_SIZE  + TILE_SIZE;
+	    	  // truncuate then add to get the coordinate of the FIRST grid (horizontal
+	          // wall) that is in front of the player (this is in pixel unit)
+	          // ROUND DOWN
+	    	  horizontalGrid = (playerY/TILE_SIZE)*TILE_SIZE  + TILE_SIZE;
 
-	        // compute distance to the next horizontal wall
-	        distToNextHorizontalGrid = TILE_SIZE;
+	    	  // compute distance to the next horizontal wall
+	    	  distToNextHorizontalGrid = TILE_SIZE;
 
-	        float xtemp = invTanTable[castArc]*(horizontalGrid-playerY);
-	                // we can get the vertical distance to that wall by
-	                // (horizontalGrid-GLplayerY)
-	                // we can get the horizontal distance to that wall by
-	                // 1/tan(arc)*verticalDistance
-	                // find the x interception to that wall
-	        xIntersection = xtemp + playerX;
+	    	  float xtemp = invTanTable[castArc]*(horizontalGrid-playerY);
+	          // we can get the vertical distance to that wall by
+	          // (horizontalGrid-GLplayerY)
+	          // we can get the horizontal distance to that wall by
+	          // 1/tan(arc)*verticalDistance
+	          // find the x interception to that wall
+	    	  xIntersection = xtemp + playerX;
 	      }
-	      // else, the ray is facing up
-	      else
+	      else // else, the ray is facing up
 	      {
-	        horizontalGrid = (playerY/TILE_SIZE)*TILE_SIZE;
-	        distToNextHorizontalGrid = -TILE_SIZE;
+	    	  horizontalGrid = (playerY/TILE_SIZE)*TILE_SIZE;
+	    	  distToNextHorizontalGrid = -TILE_SIZE;
 
-	        float xtemp = invTanTable[castArc]*(horizontalGrid - playerY);
-	        xIntersection = xtemp + playerX;
+	    	  float xtemp = invTanTable[castArc]*(horizontalGrid - playerY);
+	    	  xIntersection = xtemp + playerX;
 
-	        horizontalGrid--;
+	    	  horizontalGrid--;
 	      }
-	          // LOOK FOR HORIZONTAL WALL
+
+	      // LOOK FOR HORIZONTAL WALL
 	      if (castArc==ANGLE0 || castArc==ANGLE180)
 	      {
-	        distToHorizontalGridBeingHit=9999999F;//Float.MAX_VALUE;
+	    	  distToHorizontalGridBeingHit=9999999F;
 	      }
-	      // else, move the ray until it hits a horizontal wall
-	      else
+	      else // else, move the ray until it hits a horizontal wall
 	      {
-	        distToNextXIntersection = xStepTable[castArc];
-	        while (true)
-	        {
-	          xGridIndex = (int)(xIntersection/TILE_SIZE);
-	          // in the picture, yGridIndex will be 1
-	          yGridIndex = (horizontalGrid/TILE_SIZE);
-
-	          if ((xGridIndex>=MAP_WIDTH) ||
-	            (yGridIndex>=MAP_HEIGHT) ||
-	            xGridIndex<0 || yGridIndex<0)
-	          {
-	            distToHorizontalGridBeingHit = Float.MAX_VALUE;
-	            break;
-	          }
-	          else if ((fMap[yGridIndex*MAP_WIDTH+xGridIndex])!=O)
-	          {
-	            distToHorizontalGridBeingHit  = (xIntersection-playerX)*invCosTable[castArc];
-	            break;
-	          }
-	          // else, the ray is not blocked, extend to the next block
-	          else
-	          {
-	            xIntersection += distToNextXIntersection;
-	            horizontalGrid += distToNextHorizontalGrid;
-	          }
-	        }
+	    	  distToNextXIntersection = xStepTable[castArc];
+	    	  while (true)
+	    	  {
+	    		  xGridIndex = (int)(xIntersection/TILE_SIZE);
+	    		  // in the picture, yGridIndex will be 1
+	    		  yGridIndex = (horizontalGrid/TILE_SIZE);
+	    		  
+	    		  if ((xGridIndex>=MAP_WIDTH) ||
+	    			  (yGridIndex>=MAP_HEIGHT) ||
+	    			  xGridIndex<0 || yGridIndex<0) {
+	    			  	distToHorizontalGridBeingHit = Float.MAX_VALUE;
+	    			  	break;
+	    		  }
+	    		  else if ((fMap[yGridIndex*MAP_WIDTH+xGridIndex])!=O)
+	    		  {
+	    			  distToHorizontalGridBeingHit  = (xIntersection-playerX)*invCosTable[castArc];
+	    			  break;
+	    		  }
+	    		  else // else, the ray is not blocked, extend to the next block
+	    		  {
+	    			  xIntersection += distToNextXIntersection;
+	    			  horizontalGrid += distToNextHorizontalGrid;
+	    		  }
+	    	  }
 	      }
-
 
 	      // FOLLOW X RAY
 	      if (castArc < ANGLE90 || castArc > ANGLE270)
 	      {
-	        verticalGrid = TILE_SIZE + (playerX/TILE_SIZE)*TILE_SIZE;
-	        distToNextVerticalGrid = TILE_SIZE;
-
-	        float ytemp = tanTable[castArc]*(verticalGrid - playerX);
-	        yIntersection = ytemp + playerY;
+	    	  verticalGrid = TILE_SIZE + (playerX/TILE_SIZE)*TILE_SIZE;
+	    	  distToNextVerticalGrid = TILE_SIZE;
+	    	  
+	    	  float ytemp = tanTable[castArc]*(verticalGrid - playerX);
+	    	  yIntersection = ytemp + playerY;
 	      }
 	      // RAY FACING LEFT
 	      else
 	      {
-	        verticalGrid = (playerX/TILE_SIZE)*TILE_SIZE;
-	        distToNextVerticalGrid = -TILE_SIZE;
+	    	  verticalGrid = (playerX/TILE_SIZE)*TILE_SIZE;
+	    	  distToNextVerticalGrid = -TILE_SIZE;
+	    	  
+	    	  float ytemp = tanTable[castArc]*(verticalGrid - playerX);
+	    	  yIntersection = ytemp + playerY;
 
-	        float ytemp = tanTable[castArc]*(verticalGrid - playerX);
-	        yIntersection = ytemp + playerY;
-
-	        verticalGrid--;
+	    	  verticalGrid--;
 	      }
 	          // LOOK FOR VERTICAL WALL
 	      if (castArc==ANGLE90||castArc==ANGLE270)
 	      {
-	        distToVerticalGridBeingHit = 9999999;//Float.MAX_VALUE;
+	    	  distToVerticalGridBeingHit = 9999999;//Float.MAX_VALUE;
 	      }
 	      else
 	      {
-	        distToNextYIntersection = yStepTable[castArc];
-	        while (true)
-	        {
-	          // compute current map position to inspect
-	          xGridIndex = (verticalGrid/TILE_SIZE);
-	          yGridIndex = (int)(yIntersection/TILE_SIZE);
-
-	          if ((xGridIndex>=MAP_WIDTH) ||
-	            (yGridIndex>=MAP_HEIGHT) ||
-	            xGridIndex<0 || yGridIndex<0)
-	          {
-	            distToVerticalGridBeingHit = Float.MAX_VALUE;
-	            break;
-	          }
-	          else if ((fMap[yGridIndex*MAP_WIDTH+xGridIndex])!=O)
-	          {
-	            distToVerticalGridBeingHit =(yIntersection-playerY)*invSinTable[castArc];
-	            break;
-	          }
-	          else
-	          {
-	            yIntersection += distToNextYIntersection;
-	            verticalGrid += distToNextVerticalGrid;
-	          }
-	        }
+	    	  distToNextYIntersection = yStepTable[castArc];
+	    	  while (true)
+	    	  {
+	    		  // compute current map position to inspect
+	    		  xGridIndex = (verticalGrid/TILE_SIZE);
+	    		  yGridIndex = (int)(yIntersection/TILE_SIZE);
+	    		  
+	    		  if ((xGridIndex>=MAP_WIDTH) ||
+	    				  (yGridIndex>=MAP_HEIGHT) ||
+	    				  xGridIndex<0 || yGridIndex<0)
+	    		  {
+	    			  distToVerticalGridBeingHit = Float.MAX_VALUE;
+	    			  break;
+	    		  }
+	    		  else if ((fMap[yGridIndex*MAP_WIDTH+xGridIndex])!=O)
+	    		  {
+	    			  distToVerticalGridBeingHit =(yIntersection-playerY)*invSinTable[castArc];
+	    			  break;
+	    		  }
+	    		  else
+	    		  {
+	    			  yIntersection += distToNextYIntersection;
+	    			  verticalGrid += distToNextVerticalGrid;
+	    		  }
+	    	  }
 	      }
-
+	      
 	      // DRAW THE WALL SLICE
-	      float dist;
 	      int topOfWall;   // used to compute the top and bottom of the sliver that
-	      int bottomOfWall;   // will be the staring point of floor and ceiling
+	      int bottomOfWall;   // will be the starting point of floor and ceiling
+	      
+	      int drawX, drawY, srcX, srcY, srcHeight;
+          
 	      // determine which ray strikes a closer wall.
-	      // if yray distance to the wall is closer, the yDistance will be shorter than
-	          // the xDistance
+	      // if y ray distance to the wall is closer, the yDistance will be shorter than
+	      // the xDistance
+	      
+	      // map our textures to a 64pixel tile (multiply by 2 since it looks nicer)
+	      int textureStretch = (TILE_SIZE/wallTexData.getWidth())*2;
 	      if (distToHorizontalGridBeingHit < distToVerticalGridBeingHit)
-	          {
-	                // the next function call (drawRayOnMap()) is not a part of raycating rendering part, 
-	                // it just draws the ray on the overhead map to illustrate the raycasting process
-	            //drawRayOnOverheadMap(xIntersection, horizontalGrid);
-	    	  dist=distToHorizontalGridBeingHit;
-	    	  pixmap.setColor(0.5f, 0.5f, 0.5f, 1.0f);
+	      {
+		      // the next function call (drawRayOnMap()) is not a part of raycasting rendering part, 
+		      // it just draws the ray on the overhead map to illustrate the raycasting process
+		      //drawRayOnOverheadMap(xIntersection, horizontalGrid);
+		      dist = distToHorizontalGridBeingHit;
+		      pixmap.setColor(0.5f, 0.5f, 0.5f, 1.0f);
+			  srcX = ((int)(xIntersection/textureStretch) % wallTexData.getWidth());
+			  srcY = 0;
 	      }
-	      // else, we use xray instead (meaning the vertical wall is closer than
-	      //   the horizontal wall)
-	          else
-	          {
-	                // the next function call (drawRayOnMap()) is not a part of raycating rendering part, 
-	                // it just draws the ray on the overhead map to illustrate the raycasting process
-	            //drawRayOnOverheadMap(verticalGrid, yIntersection);
-	        dist=distToVerticalGridBeingHit;
-	        pixmap.setColor(0.25f, 0.25f, 0.25f, 1.0f);
-	          }
+	      else
+	      {
+		      // else, we use xray instead (meaning the vertical wall is closer than
+		      //   the horizontal wall)
+	    	  
+	    	  
+		      // the next function call (drawRayOnMap()) is not a part of raycasting rendering part, 
+		      // it just draws the ray on the overhead map to illustrate the raycasting process
+		      //drawRayOnOverheadMap(verticalGrid, yIntersection);
+		      dist = distToVerticalGridBeingHit;
+		      srcX = ((int)(yIntersection/textureStretch) % wallTexData.getWidth());
+		      srcY = 0;
+	      }
 
-	          // correct distance (compensate for the fishbown effect)
+	      // correct distance (compensate for the fishbowl effect)
 	      dist /= fishTable[castColumn];
-	          // projected_wall_height/wall_height = fPlayerDistToProjectionPlane/dist;
-	          int projectedWallHeight=(int)(WALL_HEIGHT*(float)playerDistanceToProjectionPlane/dist);
+	      // projected_wall_height/wall_height = fPlayerDistToProjectionPlane/dist;
+	      int projectedWallHeight=(int)(WALL_HEIGHT*(float)playerDistanceToProjectionPlane/dist);
 	      bottomOfWall = projectionPlaneYCenter+(int)(projectedWallHeight*0.5F);
 	      topOfWall = PROJECTION_PLANE_HEIGHT-bottomOfWall;
-	          if (bottomOfWall>=PROJECTION_PLANE_HEIGHT)
-	                bottomOfWall=PROJECTION_PLANE_HEIGHT-1;
-	          //fOffscreenGraphics.drawLine(castColumn, topOfWall, castColumn, bottomOfWall);
-	          //fOffscreenGraphics.fillRect(castColumn, topOfWall, 5, projectedWallHeight);
-	          pixmap.fillRectangle(castColumn, topOfWall, 5, projectedWallHeight);
+	      if (bottomOfWall>=PROJECTION_PLANE_HEIGHT)
+	    	  bottomOfWall=PROJECTION_PLANE_HEIGHT-1;
 	          
-	          // TRACE THE NEXT RAY
-	          castArc+=5;
-	          if (castArc>=ANGLE360)
-	                castArc-=ANGLE360;
+          // drawPixmap( pixmap, srcx, srcy, srcWidth, srcHeight, dstX, dstY, dstWidth, dstHeight );
+	      int srcW = wallTexData.getWidth()/TILE_SIZE;
+	      if( srcW == 0 ) srcW = 1;
+          pixmap.drawPixmap(wallPixmap, srcX, srcY, srcW, wallTexData.getHeight(), 
+       		  				castColumn, topOfWall, STRIDE, projectedWallHeight);
+          //pixmap.fillRectangle(castColumn, topOfWall, 5, projectedWallHeight);
+	          
+          
+          // TRACE THE NEXT RAY
+          castArc+=STRIDE;
+          if (castArc>=ANGLE360)
+        	  castArc-=ANGLE360;
 	    }
+	    
+	    return dist;
 	}
 	
 
